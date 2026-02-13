@@ -1,46 +1,354 @@
-# Test 1: Create a simple integer table
-statement ok
-CREATE TABLE test_int (id INTEGER, value INTEGER)
+# ============================================================
+# Comprehensive syntax highlighting test for sqllogictest-mode
+# ============================================================
 
-# Test 2: Insert some integer values
-statement ok
-INSERT INTO test_int VALUES (1, 100)
+# ----------------------------------------------------------
+# Comments: lines starting with # (font-lock-comment-face)
+# ----------------------------------------------------------
 
-statement ok
-INSERT INTO test_int VALUES (2, 200)
+# This is a comment
+# Another comment with special chars: !@$%^&*()
 
-statement ok
-INSERT INTO test_int VALUES (3, 300)
+# ----------------------------------------------------------
+# Query commands: query <types> [sort] [label]
+# ----------------------------------------------------------
 
-# Test 3: Select all rows (with rowsort for deterministic ordering)
+# Basic query with single type
+query T
+SELECT 'hello'
+----
+hello
+
+# Query with multiple types
+query IITR
+SELECT 1, 2, 'x', 3.14
+----
+1 2 x 3.14
+
+# Query with sort mode
 query II rowsort
-SELECT * FROM test_int
+SELECT id, value FROM t
 ----
 1 100
 2 200
-3 300
 
-# Test 11: WHERE clause with comparison on float
+# Query with nosort
+query I nosort
+SELECT id FROM t ORDER BY id
+----
+1
+2
+
+# Query with valuesort
+query I valuesort
+SELECT id FROM t
+----
+1
+2
+
+# Query with sort and label
+query I nosort my-label
+SELECT 1
+----
+1
+
+# Query with rowsort and label
+query TT rowsort another_label
+SELECT name, city FROM people
+----
+Alice NYC
+Bob LA
+
+# ----------------------------------------------------------
+# Statement commands: statement <ok|error|count> [N]
+# ----------------------------------------------------------
+
+# Statement ok
+statement ok
+CREATE TABLE t1 (id INTEGER, name TEXT)
+
+# Statement error
+statement error
+CREATE TABLE t1 (id INTEGER, name TEXT)
+
+# Statement count with number
+statement count 3
+INSERT INTO t1 VALUES (1, 'a'), (2, 'b'), (3, 'c')
+
+# Statement count zero
+statement count 0
+DELETE FROM t1 WHERE id > 999
+
+# ----------------------------------------------------------
+# Conditional directives: skipif/onlyif <engine>
+# ----------------------------------------------------------
+
+# skipif directive
+skipif postgresql
+query I nosort
+SELECT 1
+----
+1
+
+# onlyif directive
+onlyif mysql
+statement ok
+SELECT 1
+
+# skipif with another engine
+skipif sqlite
+statement ok
+CREATE INDEX idx1 ON t1 (name)
+
+# onlyif with another engine
+onlyif mssql
+query T nosort
+SELECT 'mssql only'
+----
+mssql only
+
+# ----------------------------------------------------------
+# Control records: halt, hash-threshold
+# ----------------------------------------------------------
+
+# halt stops test execution
+halt
+
+# hash-threshold sets result hashing threshold
+hash-threshold 100
+
+# hash-threshold with large value
+hash-threshold 99999
+
+# ----------------------------------------------------------
+# Result separator: ---- (font-lock-builtin-face)
+# ----------------------------------------------------------
+
+query I nosort
+SELECT 1
+----
+1
+
+# ----------------------------------------------------------
+# SQL keywords (case insensitive, font-lock-keyword-face)
+# ----------------------------------------------------------
+
+# DML keywords
+statement ok
+SELECT DISTINCT id FROM t1 WHERE id IN (1, 2) AND name IS NOT NULL
+
+statement ok
+INSERT INTO t1 VALUES (4, 'd')
+
+statement ok
+UPDATE t1 SET name = 'updated' WHERE id = 4
+
+statement ok
+DELETE FROM t1 WHERE id = 4
+
+# DDL keywords
+statement ok
+CREATE TABLE t2 (id INTEGER)
+
+statement ok
+ALTER TABLE t2 ADD COLUMN name TEXT
+
+statement ok
+CREATE INDEX idx2 ON t2 (id)
+
+statement ok
+CREATE VIEW v1 AS SELECT * FROM t2
+
+statement ok
+DROP VIEW v1
+
+statement ok
+DROP INDEX idx2
+
+statement ok
+DROP TABLE t2
+
+# JOIN keywords
+query II rowsort
+SELECT a.id, b.id FROM t1 AS a INNER JOIN t1 AS b ON a.id = b.id
+
+query II rowsort
+SELECT a.id, b.id FROM t1 AS a LEFT JOIN t1 AS b ON a.id = b.id
+
+query II rowsort
+SELECT a.id, b.id FROM t1 AS a RIGHT JOIN t1 AS b ON a.id = b.id
+
+query II rowsort
+SELECT a.id, b.id FROM t1 AS a LEFT OUTER JOIN t1 AS b ON a.id = b.id
+
+query II rowsort
+SELECT a.id, b.id FROM t1 AS a CROSS JOIN t1 AS b
+
+# Set operations
+query I rowsort
+SELECT id FROM t1 UNION SELECT id FROM t1
+
+query I rowsort
+SELECT id FROM t1 EXCEPT SELECT id FROM t1 WHERE id > 2
+
+query I rowsort
+SELECT id FROM t1 INTERSECT SELECT id FROM t1
+
+# Subquery keywords
+query I rowsort
+SELECT id FROM t1 WHERE EXISTS (SELECT 1 FROM t1)
+
+query I rowsort
+SELECT id FROM t1 WHERE id IN (SELECT id FROM t1)
+
+query I rowsort
+SELECT id FROM t1 WHERE id BETWEEN 1 AND 10
+
+query T rowsort
+SELECT name FROM t1 WHERE name LIKE '%a%'
+
+# Ordering and grouping
 query IT rowsort
-SELECT id, name FROM test_mixed WHERE score > 90.0
-----
-1 Alice
-3 Charlie
+SELECT id, name FROM t1 ORDER BY id ASC
 
-# Test 12: Create table with NULL support
-statement ok
-CREATE TABLE test_null (id INTEGER, value INTEGER)
+query IT rowsort
+SELECT id, name FROM t1 ORDER BY id DESC
 
-# Test 13: Insert with explicit NULL (if parser supports)
-statement ok
-INSERT INTO test_null VALUES (1, 100)
-
-statement ok
-INSERT INTO test_null VALUES (2, 200)
-
-# Test 14: Select from null table
 query II rowsort
-SELECT * FROM test_null
+SELECT id, COUNT(*) FROM t1 GROUP BY id HAVING COUNT(*) > 0
+
+# Limiting
+query I nosort
+SELECT id FROM t1 ORDER BY id LIMIT 5 OFFSET 0
+
+# CASE expression
+query T nosort
+SELECT CASE WHEN id = 1 THEN 'one' ELSE 'other' END FROM t1
+
+# NULL handling
+query I rowsort
+SELECT id FROM t1 WHERE name IS NULL OR name IS NOT NULL
+
+# ALL / ANY
+query I rowsort
+SELECT ALL id FROM t1
+
+# DATABASE / SCHEMA keywords
+statement ok
+CREATE DATABASE test_db
+
+statement ok
+CREATE SCHEMA test_schema
+
+# ----------------------------------------------------------
+# SQL keywords lowercase (case-fold matching)
+# ----------------------------------------------------------
+
+query II rowsort
+select id, value from t1 where id > 0 order by id asc limit 10
+
+statement ok
+insert into t1 values (5, 'e')
+
+statement ok
+update t1 set name = 'updated' where id = 5
+
+statement ok
+delete from t1 where id = 5
+
+query I rowsort
+select distinct id from t1 union select id from t1
+
+# ----------------------------------------------------------
+# SQL functions (font-lock-function-name-face)
+# ----------------------------------------------------------
+
+# Aggregate functions
+query I nosort
+SELECT COUNT(*) FROM t1
+
+query I nosort
+SELECT SUM(id) FROM t1
+
+# NULL handling functions
+query T nosort
+SELECT COALESCE(name, 'unknown') FROM t1
+
+query T nosort
+SELECT NULLIF(name, '') FROM t1
+
+# Type conversion
+query I nosort
+SELECT CAST(id AS INTEGER) FROM t1
+
+# Multiple functions in one query
+query IIII nosort
+SELECT COUNT(*), SUM(id), MIN(id), MAX(id) FROM t1
+
+# ----------------------------------------------------------
+# Numbers (font-lock-constant-face)
+# ----------------------------------------------------------
+
+query I nosort
+SELECT 0
+
+query I nosort
+SELECT 42
+
+query I nosort
+SELECT 3.14
+
+query I nosort
+SELECT 100.0
+
+query I nosort
+SELECT 999999
+
+# ----------------------------------------------------------
+# String literals (font-lock-string-face)
+# ----------------------------------------------------------
+
+# Single-quoted strings
+query T nosort
+SELECT 'hello world'
+
+query T nosort
+SELECT 'it''s a test'
+
+# Double-quoted identifiers
+query T nosort
+SELECT "column_name" FROM t1
+
+# ----------------------------------------------------------
+# Mixed scenarios: multiple highlighting in one statement
+# ----------------------------------------------------------
+
+# Keywords + functions + numbers + strings combined
+query ITI rowsort
+SELECT COUNT(*), name, 42 FROM t1 WHERE name = 'Alice' AND id BETWEEN 1 AND 100 GROUP BY name ORDER BY COUNT(*) DESC LIMIT 10
 ----
-1 100
-2 200
+1 Alice 42
+
+# Nested query with multiple features
+query I nosort
+SELECT id FROM t1 WHERE id IN (SELECT MAX(id) FROM t1 WHERE name IS NOT NULL) AND ABS(id) > 0
+
+# CASE with functions and numbers
+query T nosort
+SELECT CASE WHEN COUNT(*) > 5 THEN 'many' WHEN COUNT(*) > 0 THEN 'some' ELSE 'none' END FROM t1
+
+# Multiple consecutive blocks to test no-abort regression
+query T
+SELECT 'block1'
+----
+block1
+
+query II rowsort
+SELECT 1, 2
+----
+1 2
+
+query TTT nosort
+SELECT 'a', 'b', 'c'
+----
+a b c
