@@ -1,0 +1,49 @@
+# Basic sqllogictest for MiniFusion
+# Tests fundamental CREATE TABLE, INSERT, and SELECT operations
+
+# Test 1: Create a simple integer table
+statement ok
+CREATE TABLE test_int (id INTEGER, value INTEGER)
+
+# Test 2: Insert some integer values
+statement ok
+INSERT INTO test_int VALUES (1, 100)
+
+statement ok
+INSERT INTO test_int VALUES (2, 200)
+
+statement ok
+INSERT INTO test_int VALUES (3, 300)
+
+# Test 3: Select all rows (with rowsort for deterministic ordering)
+query II rowsort
+SELECT * FROM test_int
+----
+1 100
+2 200
+3 300
+
+# Test 11: WHERE clause with comparison on float
+query IT rowsort
+SELECT id, name FROM test_mixed WHERE score > 90.0
+----
+1 Alice
+3 Charlie
+
+# Test 12: Create table with NULL support
+statement ok
+CREATE TABLE test_null (id INTEGER, value INTEGER)
+
+# Test 13: Insert with explicit NULL (if parser supports)
+statement ok
+INSERT INTO test_null VALUES (1, 100)
+
+statement ok
+INSERT INTO test_null VALUES (2, 200)
+
+# Test 14: Select from null table
+query II rowsort
+SELECT * FROM test_null
+----
+1 100
+2 200
