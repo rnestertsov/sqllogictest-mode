@@ -32,10 +32,30 @@
     ;; Comments (lines starting with #)
     ("^#.*$" . font-lock-comment-face)
 
-    ;; Query command lines
-    ("^\\(query\\)\\s-+\\([A-Z]+\\)\\s-*$"
-     (1 font-lock-keyword-face)
-     (2 font-lock-type-face))
+    ;; Query command lines: query <types> [sort] [label]
+    ("^\\(query\\)\\s-+\\([A-Za-z]+\\)\\(?:\\s-+\\([a-zA-Z]+\\)\\)?\\(?:\\s-+\\(\\S-+\\)\\)?\\s-*$"
+     (1 font-lock-function-name-face)
+     (2 font-lock-type-face)
+     (3 font-lock-type-face nil t)
+     (4 font-lock-variable-name-face nil t))
+
+    ;; Statement command lines: statement <ok|error|count> [N]
+    ("^\\(statement\\)\\s-+\\([A-Za-z]+\\)\\(?:\\s-+\\([0-9]+\\)\\)?\\s-*$"
+     (1 font-lock-function-name-face)
+     (2 font-lock-type-face)
+     (3 font-lock-constant-face nil t))
+
+
+    ;; Conditional directives: skipif/onlyif <engine>
+    ("^\\(skipif\\|onlyif\\)\\s-+\\(\\S-+\\)\\s-*$"
+     (1 font-lock-preprocessor-face)
+     (2 font-lock-string-face))
+
+    ;; Control records
+    ("^\\(halt\\)\\s-*$" (1 font-lock-warning-face))
+    ("^\\(hash-threshold\\)\\s-+\\([0-9]+\\)\\s-*$"
+     (1 font-lock-preprocessor-face)
+     (2 font-lock-constant-face))
 
     ;; Result separator
     ("^----\\s-*$" . font-lock-builtin-face)
@@ -57,7 +77,7 @@
     (,(concat "\\(?:^\\|[^a-zA-Z0-9_]\\)\\("
               (regexp-opt '("COUNT" "SUM" "AVG" "MIN" "MAX" "COALESCE" "NULLIF"
                            "CAST" "CONVERT" "SUBSTRING" "LOWER" "UPPER" "TRIM"
-                           "LENGTH" "ROUND" "ABS" "FLOOR" "CEILING" "NOW" "DATE"
+                           "LENGTH" "ROUND" "ABS" "CEIL" "FLOOR" "CEILING" "NOW" "DATE"
                            "YEAR" "MONTH" "DAY"))
               "\\)\\(?:[^a-zA-Z0-9_]\\|$\\)")
      (1 font-lock-function-name-face))
@@ -69,9 +89,6 @@
     ("'[^']*'" . font-lock-string-face)
     ("\"[^\"]*\"" . font-lock-string-face)
 
-    ;; Identifiers that look like database objects (contain underscores or start with uppercase)
-    ("\\b[A-Z][a-zA-Z0-9_]*\\b" . font-lock-variable-name-face)
-    ("\\b[a-z]+_[a-zA-Z0-9_]*\\b" . font-lock-variable-name-face)
     )
   "Keyword highlighting specification for sqllogictest-mode.")
 
@@ -79,6 +96,26 @@
   (let ((map (make-sparse-keymap)))
     map)
   "Keymap for sqllogictest-mode.")
+
+(defun sqllogictest-extend-region ()
+  "Extend the font-lock region to include complete test blocks.
+This ensures that multiline constructs (query/statement + SQL + results)
+are fontified as a unit."
+  (save-excursion
+    (goto-char font-lock-beg)
+    ;; Go back to the previous comment line (test boundary)
+    (while (and (not (bobp))
+                (not (looking-at "^#")))
+      (forward-line -1))
+    (setq font-lock-beg (point))
+
+    (goto-char font-lock-end)
+    ;; Go forward to the next comment line or end of buffer
+    (while (and (not (eobp))
+                (not (looking-at "^#")))
+      (forward-line 1))
+    (setq font-lock-end (point)))
+  nil)
 
 ;;;###autoload
 (define-derived-mode sqllogictest-mode fundamental-mode "SQLLogicTest"
@@ -95,6 +132,10 @@ sqllogictest files contain test cases for SQL engines with:
 
   ;; Font lock
   (setq-local font-lock-defaults '(sqllogictest-font-lock-keywords nil t))
+
+  ;; Add multiline font-lock support
+  (add-hook 'font-lock-extend-region-functions
+            #'sqllogictest-extend-region nil t)
 
   ;; Comment syntax
   (setq-local comment-start "# ")
