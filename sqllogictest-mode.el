@@ -1,20 +1,50 @@
 ;;; sqllogictest-mode.el --- Major mode for sqllogictest files -*- lexical-binding: t -*-
 
-;; Author: Roman Nestertsov
+;; Copyright (C) 2025 Roman Nestertsov
+;;
+;; Author: Roman Nestertsov <r.nestertsov@gmail.com>
 ;; Version: 1.0
+;; URL: https://github.com/rnestertsov/sqllogictest-mode
+;; Package-Requires: ((emacs "25.1"))
 ;; Keywords: languages, sql, testing
+;;
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
-;; This mode provides syntax highlighting for sqllogictest files (.slt).
+;; This package provides a major mode for editing sqllogictest (.slt) files.
+;; sqllogictest is a program originally developed for SQLite to verify the
+;; correctness of SQL database engines using test scripts.  The format is
+;; now widely used by other database projects (CockroachDB, DuckDB, etc.).
+;;
 ;; sqllogictest files contain:
 ;; - Comments starting with #
-;; - Query commands: "query <types>"
+;; - Query commands: "query <types> [sort] [label]"
+;; - Statement commands: "statement <ok|error|count>"
+;; - Conditional directives: "skipif" and "onlyif"
+;; - Control records: "halt" and "hash-threshold"
 ;; - SQL statements
 ;; - Expected results separated by ----
-;; - Result data
+;;
+;; The mode provides syntax highlighting for all of the above, plus
+;; SQL keywords, functions, strings, and numbers within SQL statements.
 
 ;;; Code:
+
+;; Variables dynamically bound by font-lock for region extension
+(defvar font-lock-beg)
+(defvar font-lock-end)
 
 (defvar sqllogictest-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -87,9 +117,7 @@
 
     ;; String literals
     ("'[^']*'" . font-lock-string-face)
-    ("\"[^\"]*\"" . font-lock-string-face)
-
-    )
+    ("\"[^\"]*\"" . font-lock-string-face))
   "Keyword highlighting specification for sqllogictest-mode.")
 
 (defvar sqllogictest-mode-map
